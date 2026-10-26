@@ -165,7 +165,7 @@
   const parseNum = (v) => parseFloat(String(v).replace(',', '.')) || 0;
 
   // Celdas del dibujo: fracciones dentro del marco
-  function cellsFor(tipo) {
+  function cellsFor(tipo, lado) {
     const V = (x, y, w, h, k) => ({ x, y, w, h, k });
     switch (tipo) {
       case 'corrediza': return [V(0,0,.5,1,'corr'), V(.5,0,.5,1,'corr')];
@@ -177,7 +177,9 @@
       case 'puerta-cuarto': return [V(0,0,1,.25,'vidrio'), V(0,.25,1,.75,'macizo')];
       case 'puerta-vidriada': return [V(0,0,1,1,'vidrio')];
       case 'puerta-panofijo': return [V(0,0,.6,1,'abrir'), V(.6,0,.4,1,'vidrio')];
-      case 'patagonica': return [V(0,0,1,.35,'vidrio'), V(0,.35,1,.65,'osc')];
+      case 'patagonica': return lado === 'izq'
+        ? [V(0,0,.3,1,'abrir'), V(.3,0,.7,1,'vidrio')]
+        : [V(0,0,.7,1,'vidrio'), V(.7,0,.3,1,'abrir')];
       case 'basculante': return [V(0,0,1,1,'basc')];
       case 'grilla': {
         const out = [];
@@ -225,7 +227,7 @@
     doc.setDrawColor(...TRAZO); doc.setLineWidth(0.35);
     doc.line(x - 1.5, y + H + 0.7, x + W + 1.5, y + H + 0.7);
 
-    for (const c of cellsFor(tipo)) {
+    for (const c of cellsFor(tipo, lado)) {
       const cx = ix + c.x * iw, cy = iy + c.y * ih, cw = c.w * iw, ch = c.h * ih;
       const operable = ['osc', 'abrir', 'corr', 'basc'].includes(c.k);
 
@@ -256,8 +258,15 @@
         doc.line(gx + gw / 2, gy + 0.6, gx + gw - 0.6, gy + gh - 0.6);
       }
       if (c.k === 'abrir') {
-        doc.line(gx + 0.6, gy + 0.6, gx + gw - 0.6, gy + gh / 2);
-        doc.line(gx + gw - 0.6, gy + gh / 2, gx + 0.6, gy + gh - 0.6);
+        if (lado === 'der') {
+          // bisagra a la izquierda, manija a la derecha
+          doc.line(gx + 0.6, gy + 0.6, gx + gw - 0.6, gy + gh / 2);
+          doc.line(gx + gw - 0.6, gy + gh / 2, gx + 0.6, gy + gh - 0.6);
+        } else {
+          // bisagra a la derecha, manija a la izquierda
+          doc.line(gx + gw - 0.6, gy + 0.6, gx + 0.6, gy + gh / 2);
+          doc.line(gx + 0.6, gy + gh / 2, gx + gw - 0.6, gy + gh - 0.6);
+        }
       }
       if (c.k === 'corr') doc.line(gx + gw * 0.15, gy + gh / 2, gx + gw * 0.85, gy + gh / 2);
       if (c.k === 'basc') doc.line(gx + 0.6, gy + gh - 0.6, gx + gw - 0.6, gy + gh - 0.6);
