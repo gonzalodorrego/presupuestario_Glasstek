@@ -136,8 +136,15 @@
     { id: 'cortina', nombre: 'Cerramiento cortina de cristal', tipo: 'grilla', aMedida: true }
   ];
 
-  const COLORES = ['Negro Módena', 'Blanco'];
-  const VIDRIOS = ['Float 4mm', 'DVH (cámara)'];
+  const COLORES_POR_LINEA = {
+    'Módena': ['Negro Módena', 'Blanco Módena'],
+    'A30': ['A30 new negro', 'A30 new blanco']
+  };
+  const COLORES_DEFAULT = ['Negro Módena', 'Blanco Módena'];
+  // Todas las opciones de color siempre disponibles (Módena y A30)
+  const COLORES_TODOS = [...COLORES_DEFAULT, ...COLORES_POR_LINEA['A30']];
+  const coloresPara = () => COLORES_TODOS;
+  const VIDRIOS = ['Float 4mm', 'DVH (cámara)', 'DVH 4 + 9 + 4', 'Laminado 3 + 3', 'DVH 4 + 7 + 3 + 3'];
   const MAX_FILAS_PDF = 5;
 
   // ---------- Datos de la empresa (completar CUIT y logo) ----------
@@ -216,7 +223,7 @@
   function agregarItem() {
     const tr = document.createElement('tr');
     const prodOpts = CATALOGO.map(p => `<option value="${p.id}">${p.nombre}${p.linea ? ' — ' + p.linea : ''}</option>`).join('');
-    const colorOpts = COLORES.map(c => `<option>${c}</option>`).join('');
+    const colorOpts = COLORES_TODOS.map(c => `<option>${c}</option>`).join('');
     const vidrioOpts = VIDRIOS.map(v => `<option>${v}</option>`).join('');
     tr.innerHTML = `
       <td>
@@ -224,6 +231,10 @@
         <div class="sub-sel">
           <select class="color">${colorOpts}</select>
           <select class="vidrio">${vidrioOpts}</select>
+        </div>
+        <div class="sub-sel">
+          <select class="premarco"><option>Premarco: incluye</option><option>Premarco: no incluye</option></select>
+          <select class="contramarco"><option>Contramarco: incluye</option><option>Contramarco: no incluye</option></select>
         </div>
       </td>
       <td class="medida-cell"><span class="muted">—</span></td>
@@ -240,6 +251,9 @@
     const p = CATALOGO.find(x => x.id === sel.value);
     const celda = tr.querySelector('.medida-cell');
     const precio = tr.querySelector('.precio');
+    if (p) {
+      tr.querySelector('.color').innerHTML = coloresPara(p).map(c => `<option>${c}</option>`).join('');
+    }
     if (!p) {
       celda.innerHTML = '<span class="muted">—</span>';
       precio.value = '';
@@ -273,6 +287,8 @@
       p, w, h, etiqueta,
       color: tr.querySelector('.color').value,
       vidrio: tr.querySelector('.vidrio').value,
+      premarco: tr.querySelector('.premarco').value,
+      contramarco: tr.querySelector('.contramarco').value,
       cant: parseFloat(tr.querySelector('.cant').value) || 0,
       precio: parseFloat(tr.querySelector('.precio').value) || 0
     };
@@ -282,7 +298,7 @@
     const aM = f.p.aMedida ? ' (a medida)' : '';
     const med = f.etiqueta ? ', ' + f.etiqueta : '';
     const lin = f.p.linea ? ' — línea ' + f.p.linea : '';
-    return `${f.p.nombre}${lin}${aM}${med}. Color ${f.color}. Vidriado: ${f.vidrio}.`;
+    return `${f.p.nombre}${lin}${aM}${med}. Color ${f.color}. Vidriado: ${f.vidrio}. ${f.premarco}. ${f.contramarco}.`;
   }
 
   function filasValidas() {
@@ -540,6 +556,8 @@
         prod: tr.querySelector('.prod').value,
         color: tr.querySelector('.color').value,
         vidrio: tr.querySelector('.vidrio').value,
+        premarco: tr.querySelector('.premarco').value,
+        contramarco: tr.querySelector('.contramarco').value,
         cant: tr.querySelector('.cant').value,
         precio: tr.querySelector('.precio').value
       };
@@ -570,6 +588,8 @@
       }
       tr.querySelector('.color').value = it.color;
       tr.querySelector('.vidrio').value = it.vidrio;
+      if (it.premarco) tr.querySelector('.premarco').value = it.premarco;
+      if (it.contramarco) tr.querySelector('.contramarco').value = it.contramarco;
       tr.querySelector('.cant').value = it.cant;
       tr.querySelector('.precio').value = it.precio;
     });
