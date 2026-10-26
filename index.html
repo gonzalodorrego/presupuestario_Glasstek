@@ -412,10 +412,6 @@
   function buildPDF() {
     const filas = filasValidas();
     if (filas.length === 0) { alert('Agregá al menos una abertura.'); return null; }
-    if (filas.length > MAX_FILAS_PDF) {
-      alert(`Este presupuesto tiene ${filas.length} aberturas y en una hoja entran hasta ${MAX_FILAS_PDF}. Dividilo en dos presupuestos.`);
-      return null;
-    }
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -498,35 +494,49 @@
     doc.setFontSize(8);
     txt(`Validez: ${validez} días`, 110, 80);
 
-    // Tabla de aberturas
-    const yTabla = 96, hTabla = 112;
-    caja(8, yTabla, 194, hTabla);
-    const cProd = 34, cCant = 140, cPrec = 170, cImp = 200;
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(8);
-    txt('Producto', cProd, yTabla + 6);
-    txt('Cantidad', cCant, yTabla + 6, { align: 'right' });
-    txt('Precio unitario', cPrec, yTabla + 6, { align: 'right' });
-    txt('Importe', cImp, yTabla + 6, { align: 'right' });
-    doc.line(8, yTabla + 9, 202, yTabla + 9);
+    // Artículos: encabezado gris, dibujo con cotas a la izquierda y descripción a la derecha
+    const ALTO_BLOQUE = 46;
+    const LIMITE = 205;
+    const letra = (i) => String.fromCharCode(65 + i);
+    let y = 96;
 
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(7.5);
-    let y = yTabla + 12;
-    for (const f of filas) {
-      const lineas = doc.splitTextToSize(descripcionFila(f), 100);
-      const rowH = Math.max(25, lineas.length * 3.6 + 6);
-      dibujarAberturaPDF(doc, f.p.tipo, 14.5, y + 4, 13, 18, f.manija, f.color);
-      dibujarCotas(doc, 14.5, y + 4, 13, 18, f.w, f.h);
-      txt(lineas, cProd, y + 3);
-      txt(String(f.cant), cCant, y + 3, { align: 'right' });
-      txt(f.precio ? fmt(f.precio) : 'A cotizar', cPrec, y + 3, { align: 'right' });
-      txt(f.precio ? fmt(f.cant * f.precio) : 'A cotizar', cImp, y + 3, { align: 'right' });
-      y += rowH;
-    }
+    filas.forEach((f, i) => {
+      if (y + ALTO_BLOQUE > LIMITE) { doc.addPage(); y = 20; }
 
-    // Cuadro de IVA a la izquierda
-    const yT = 212;
+      doc.setFillColor(228, 233, 238);
+      doc.rect(8, y, 194, 6, 'F');
+      doc.setFont(undefined, 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
+      txt(`Artículo ${letra(i)} (Cant.: ${f.cant})`, 10, y + 4.2);
+
+      dibujarAberturaPDF(doc, f.p.tipo, 30, y + 14, 24, 30, f.manija, f.color);
+      dibujarCotas(doc, 30, y + 14, 24, 30, f.w, f.h);
+
+      const xd = 66;
+      let yd = y + 12;
+      doc.setFont(undefined, 'bold'); doc.setFontSize(8.5);
+      txt(`${f.p.nombre}${f.p.linea ? ' — línea ' + f.p.linea : ''}${f.p.aMedida ? ' (a medida)' : ''}`, xd, yd);
+      doc.setFont(undefined, 'normal'); doc.setFontSize(8);
+      yd += 4.5;
+      if (f.etiqueta) { txt(f.etiqueta, xd, yd); yd += 4; }
+      txt(`Vidrio: ${f.vidrio}`, xd, yd); yd += 4;
+      txt(`${f.premarco}  ·  ${f.contramarco}`, xd, yd); yd += 4;
+      txt(f.manija, xd, yd); yd += 4.5;
+      doc.setFont(undefined, 'bold'); doc.setFontSize(9);
+      txt(`Pintado: ${f.color}`, xd, yd);
+
+      doc.setFont(undefined, 'bold'); doc.setFontSize(8);
+      txt(f.precio ? `Costo parcial: $ ${fmt(f.cant * f.precio)}` : 'Costo parcial: a cotizar', 200, y + ALTO_BLOQUE - 6, { align: 'right' });
+      doc.setFont(undefined, 'normal');
+
+      doc.setDrawColor(200, 205, 210); doc.setLineWidth(0.2);
+      doc.line(8, y + ALTO_BLOQUE - 2, 202, y + ALTO_BLOQUE - 2);
+      doc.setDrawColor(0); doc.setTextColor(0, 0, 0);
+      y += ALTO_BLOQUE;
+    });
+
+    // Totales (cuadros de IVA y total)
+    let yT = y + 4;
+    if (yT + 34 > 248) { doc.addPage(); yT = 20; }
     const base = t.subtotal - t.desc;
     caja(8, yT, 110, 34);
     doc.setFont(undefined, 'bold');
@@ -542,7 +552,6 @@
     txt(fmt(base), 92, yT + 15, { align: 'right' });
     txt(fmt(t.iva), 115, yT + 15, { align: 'right' });
 
-    // Cuadro de totales a la derecha
     caja(122, yT, 80, 34);
     doc.setFontSize(8);
     txt('Subtotal', 124, yT + 7);
@@ -553,7 +562,7 @@
     txt('$ 0,00', 200, yT + 19, { align: 'right' });
     doc.setFont(undefined, 'bold');
     doc.setFontSize(10);
-    txt('Total', 124, yT + 27);
+    txt('Costo total', 124, yT + 27);
     txt(`$ ${fmt(t.total)}`, 200, yT + 27, { align: 'right' });
 
     // Observaciones
