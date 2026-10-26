@@ -188,35 +188,74 @@
     return [V(0,0,1,1,'vidrio')];
   }
 
-  // Dibujo técnico dentro del PDF (vectorial, en mm)
-  function dibujarAberturaPDF(doc, tipo, x, y, W, H) {
-    const m = 0.8;
-    const ix = x + m, iy = y + m, iw = W - 2*m, ih = H - 2*m;
-    doc.setDrawColor(29, 35, 40); doc.setLineWidth(0.5);
-    doc.rect(x, y, W, H);
+  // Dibujo técnico dentro del PDF: marco doble, hojas con perfil, vidrio y manija
+  function dibujarAberturaPDF(doc, tipo, x, y, W, H, manija) {
+    const lado = (manija || '').includes('izquierda') ? 'izq' : 'der';
+    // Marco exterior (perfil oscuro) y marco interior
+    doc.setFillColor(55, 60, 66);
+    doc.rect(x, y, W, H, 'F');
+    doc.setFillColor(214, 222, 228);
+    doc.rect(x + 0.7, y + 0.7, W - 1.4, H - 1.4, 'F');
+    const ix = x + 1.3, iy = y + 1.3, iw = W - 2.6, ih = H - 2.6;
+
     for (const c of cellsFor(tipo)) {
-      const cx = ix + c.x*iw + 0.3, cy = iy + c.y*ih + 0.3, cw = c.w*iw - 0.6, ch = c.h*ih - 0.6;
-      if (c.k === 'macizo') doc.setFillColor(185, 196, 204); else doc.setFillColor(238, 244, 247);
-      doc.setDrawColor(59, 70, 80); doc.setLineWidth(0.25);
-      doc.rect(cx, cy, cw, ch, 'FD');
-      if (c.k === 'vidrio') {
-        doc.setDrawColor(127, 166, 184);
-        doc.line(cx + 0.8, cy + ch - 0.8, cx + cw*0.45, cy + 0.8);
+      const cx = ix + c.x * iw, cy = iy + c.y * ih, cw = c.w * iw, ch = c.h * ih;
+      const operable = ['osc', 'abrir', 'corr', 'basc', 'macizo'].includes(c.k) && c.k !== 'macizo';
+      // Perfil de la hoja (borde oscuro) y vidrio o panel interior
+      doc.setFillColor(70, 76, 84);
+      doc.rect(cx + 0.2, cy + 0.2, cw - 0.4, ch - 0.4, 'F');
+      if (c.k === 'macizo') {
+        doc.setFillColor(176, 188, 197);
+      } else {
+        doc.setFillColor(232, 242, 247);
       }
-      doc.setDrawColor(59, 70, 80);
-      doc.setLineDashPattern([0.6, 0.5], 0);
+      doc.rect(cx + 0.9, cy + 0.9, cw - 1.8, ch - 1.8, 'F');
+
+      const gx = cx + 0.9, gy = cy + 0.9, gw = cw - 1.8, gh = ch - 1.8;
+      if (c.k === 'vidrio') {
+        // Reflejo del vidrio
+        doc.setDrawColor(150, 185, 200); doc.setLineWidth(0.2);
+        doc.line(gx + gw * 0.12, gy + gh * 0.9, gx + gw * 0.5, gy + gh * 0.1);
+        doc.line(gx + gw * 0.55, gy + gh * 0.95, gx + gw * 0.85, gy + gh * 0.25);
+      }
+      if (c.k === 'macizo') {
+        // Panel ciego con filete
+        doc.setDrawColor(120, 132, 142); doc.setLineWidth(0.2);
+        doc.rect(gx + 1, gy + 1, gw - 2, gh - 2);
+      }
+
+      // Líneas de apertura (punteadas)
+      doc.setDrawColor(40, 70, 95); doc.setLineWidth(0.2);
+      doc.setLineDashPattern([0.7, 0.6], 0);
       if (c.k === 'osc') {
-        doc.line(cx + 0.6, cy + ch - 0.6, cx + cw/2, cy + 0.6);
-        doc.line(cx + cw/2, cy + 0.6, cx + cw - 0.6, cy + ch - 0.6);
+        doc.line(gx + 0.5, gy + gh - 0.5, gx + gw / 2, gy + 0.5);
+        doc.line(gx + gw / 2, gy + 0.5, gx + gw - 0.5, gy + gh - 0.5);
       }
       if (c.k === 'abrir') {
-        doc.line(cx + 0.6, cy + 0.6, cx + cw - 0.6, cy + ch/2);
-        doc.line(cx + cw - 0.6, cy + ch/2, cx + 0.6, cy + ch - 0.6);
+        doc.line(gx + 0.5, gy + 0.5, gx + gw - 0.5, gy + gh / 2);
+        doc.line(gx + gw - 0.5, gy + gh / 2, gx + 0.5, gy + gh - 0.5);
       }
-      if (c.k === 'corr') doc.line(cx + cw*0.15, cy + ch/2, cx + cw*0.85, cy + ch/2);
-      if (c.k === 'basc') doc.line(cx + 0.6, cy + ch - 0.6, cx + cw - 0.6, cy + ch - 0.6);
+      if (c.k === 'corr') doc.line(gx + gw * 0.15, gy + gh / 2, gx + gw * 0.85, gy + gh / 2);
+      if (c.k === 'basc') doc.line(gx + 0.5, gy + gh - 0.5, gx + gw - 0.5, gy + gh - 0.5);
       doc.setLineDashPattern([], 0);
+
+      // Manija: en el lado elegido de cada hoja operable (en corredizas, en el borde interno)
+      if (operable) {
+        let mx;
+        if (c.k === 'corr') {
+          mx = c.x === 0 ? gx + gw - 0.6 : gx + 0.6; // borde interno de cada hoja
+        } else {
+          mx = lado === 'izq' ? gx + 0.6 : gx + gw - 0.6;
+        }
+        const my = gy + gh / 2;
+        doc.setFillColor(40, 44, 50);
+        doc.rect(mx - 0.5, my - 1.8, 1, 3.6, 'F');
+        doc.setDrawColor(40, 44, 50); doc.setLineWidth(0.3);
+        const dir = (mx > gx + gw / 2) ? -1 : 1;
+        doc.line(mx, my, mx + dir * 1.4, my);
+      }
     }
+    doc.setLineWidth(0.25);
   }
 
   // ---------- Filas de la tabla ----------
@@ -231,6 +270,9 @@
         <div class="sub-sel">
           <select class="color">${colorOpts}</select>
           <select class="vidrio">${vidrioOpts}</select>
+        </div>
+        <div class="sub-sel">
+          <select class="manija"><option>Manija: derecha</option><option>Manija: izquierda</option></select>
         </div>
         <div class="sub-sel">
           <select class="premarco"><option>Premarco: incluye</option><option>Premarco: no incluye</option></select>
@@ -289,6 +331,7 @@
       vidrio: tr.querySelector('.vidrio').value,
       premarco: tr.querySelector('.premarco').value,
       contramarco: tr.querySelector('.contramarco').value,
+      manija: tr.querySelector('.manija').value,
       cant: parseFloat(tr.querySelector('.cant').value) || 0,
       precio: parseFloat(tr.querySelector('.precio').value) || 0
     };
@@ -298,7 +341,7 @@
     const aM = f.p.aMedida ? ' (a medida)' : '';
     const med = f.etiqueta ? ', ' + f.etiqueta : '';
     const lin = f.p.linea ? ' — línea ' + f.p.linea : '';
-    return `${f.p.nombre}${lin}${aM}${med}. Color ${f.color}. Vidriado: ${f.vidrio}. ${f.premarco}. ${f.contramarco}.`;
+    return `${f.p.nombre}${lin}${aM}${med}. Color ${f.color}. Vidriado: ${f.vidrio}. ${f.manija}. ${f.premarco}. ${f.contramarco}.`;
   }
 
   function filasValidas() {
@@ -434,8 +477,8 @@
     let y = yTabla + 12;
     for (const f of filas) {
       const lineas = doc.splitTextToSize(descripcionFila(f), 108);
-      const rowH = Math.max(17, lineas.length * 3.6 + 5);
-      dibujarAberturaPDF(doc, f.p.tipo, 11, y, 10, 15);
+      const rowH = Math.max(19, lineas.length * 3.6 + 5);
+      dibujarAberturaPDF(doc, f.p.tipo, 10, y, 13, 18, f.manija);
       txt(lineas, cProd, y + 3);
       txt(String(f.cant), cCant, y + 3, { align: 'right' });
       txt(f.precio ? fmt(f.precio) : 'A cotizar', cPrec, y + 3, { align: 'right' });
@@ -558,6 +601,7 @@
         vidrio: tr.querySelector('.vidrio').value,
         premarco: tr.querySelector('.premarco').value,
         contramarco: tr.querySelector('.contramarco').value,
+        manija: tr.querySelector('.manija').value,
         cant: tr.querySelector('.cant').value,
         precio: tr.querySelector('.precio').value
       };
@@ -588,6 +632,7 @@
       }
       tr.querySelector('.color').value = it.color;
       tr.querySelector('.vidrio').value = it.vidrio;
+      if (it.manija) tr.querySelector('.manija').value = it.manija;
       if (it.premarco) tr.querySelector('.premarco').value = it.premarco;
       if (it.contramarco) tr.querySelector('.contramarco').value = it.contramarco;
       tr.querySelector('.cant').value = it.cant;
@@ -627,3 +672,4 @@
 
 </body>
 </html>
+
