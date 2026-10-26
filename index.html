@@ -25,7 +25,36 @@
   button { padding: 8px 14px; margin-top: 8px; cursor: pointer; }
   .primary { background: #0f5c6e; color: #fff; border: none; border-radius: 4px; font-size: 15px; }
   .aviso { font-size: 12px; color: #666; margin-top: 6px; }
-  @media (max-width: 640px) { td input.cant, td input.precio { width: 70px; } }
+  /* Celular: la tabla se convierte en tarjetas, con campos grandes y botones de ancho completo */
+  @media (max-width: 640px) {
+    body { margin: 12px auto; padding: 0 10px; }
+    h1 { font-size: 22px; }
+    fieldset { padding: 10px; }
+    input, select, textarea { font-size: 16px; padding: 10px; }
+    .row { grid-template-columns: 1fr; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    thead { display: none; }
+    tbody tr {
+      border: 1px solid #d7dde2; border-radius: 10px;
+      padding: 10px; margin-bottom: 12px; background: #fbfcfd;
+    }
+    td { border: none; padding: 6px 0; }
+    td::before {
+      content: attr(data-label); display: block;
+      font-size: 12px; color: #6b7780; margin-bottom: 3px;
+    }
+    td input.cant, td input.precio, td select { width: 100%; }
+    td .ancho, td .alto, td .medida-sel { width: 100%; margin-bottom: 6px; }
+    .sub-sel { grid-template-columns: 1fr 1fr; }
+    .sub-sel select { font-size: 14px; }
+    td.num { text-align: left; font-size: 16px; font-weight: bold; }
+    td.quitar { text-align: right; padding-top: 4px; }
+    td.quitar::before { display: none; }
+    td.quitar button { background: #f3e5e5; color: #a33; }
+    button { width: 100%; padding: 12px; font-size: 16px; margin-top: 10px; }
+    .totales { text-align: left; font-size: 16px; }
+    .primary { margin-bottom: 4px; }
+  }
 </style>
 </head>
 <body>
@@ -316,7 +345,7 @@
     const colorOpts = COLORES_TODOS.map(c => `<option>${c}</option>`).join('');
     const vidrioOpts = VIDRIOS.map(v => `<option>${v}</option>`).join('');
     tr.innerHTML = `
-      <td>
+      <td data-label="Producto / color / vidrio">
         <select class="prod" onchange="cambiarProducto(this)"><option value="">Elegir producto...</option>${prodOpts}</select>
         <div class="sub-sel">
           <select class="color">${colorOpts}</select>
@@ -330,11 +359,11 @@
           <select class="contramarco"><option>Contramarco: incluye</option><option>Contramarco: no incluye</option></select>
         </div>
       </td>
-      <td class="medida-cell"><span class="muted">—</span></td>
-      <td><input type="number" min="1" step="1" class="cant" value="1" oninput="calcular()"></td>
-      <td><input type="number" min="0" step="any" class="precio" oninput="calcular()"></td>
-      <td class="num sub">0,00</td>
-      <td><button onclick="this.closest('tr').remove(); calcular()">✕</button></td>`;
+      <td class="medida-cell" data-label="Medida (m)"><span class="muted">—</span></td>
+      <td data-label="Cantidad"><input type="number" min="1" step="1" class="cant" value="1" oninput="calcular()"></td>
+      <td data-label="Precio unit."><input type="number" min="0" step="any" class="precio" oninput="calcular()"></td>
+      <td class="num sub" data-label="Subtotal">0,00</td>
+      <td class="quitar"><button onclick="this.closest('tr').remove(); calcular()">✕ Quitar</button></td>`;
     document.getElementById('items').appendChild(tr);
     return tr;
   }
@@ -357,7 +386,26 @@
       precio.value = '';
       precio.placeholder = 'precio unit.';
     } else {
-      celda.innerHTML = `<select class="medida-sel" onchange="calcular()">${p.medidas.map((m, i) => `<option value="${i}">${m.etiqueta}</option>`).join('')}</select>`;
+      celda.innerHTML = `<select class="medida-sel" onchange="cambiarMedida(this)">${p.medidas.map((m, i) => `<option value="${i}">${m.etiqueta}</option>`).join('')}<option value="custom">Personalizada (ingresar medida)</option></select>`;
+      precio.value = p.precio;
+    }
+    calcular();
+  }
+
+  // Al elegir "Personalizada" aparecen ancho y alto para escribir la medida a mano
+  function cambiarMedida(sel) {
+    const tr = sel.closest('tr');
+    const p = CATALOGO.find(x => x.id === tr.querySelector('.prod').value);
+    const celda = tr.querySelector('.medida-cell');
+    const precio = tr.querySelector('.precio');
+    celda.querySelectorAll('.ancho, .alto').forEach(e => e.remove());
+    if (sel.value === 'custom') {
+      celda.insertAdjacentHTML('beforeend',
+        `<input class="ancho" placeholder="Ancho (m)" inputmode="decimal" oninput="calcular()">` +
+        `<input class="alto" placeholder="Alto (m)" inputmode="decimal" oninput="calcular()">`);
+      precio.value = '';
+      precio.placeholder = 'precio unit.';
+    } else if (p) {
       precio.value = p.precio;
     }
     calcular();
@@ -373,8 +421,15 @@
       h = parseNum(tr.querySelector('.alto').value);
       etiqueta = (w && h) ? `${fmtN(w)} x ${fmtN(h)} m` : '';
     } else {
-      const m = p.medidas[Number(tr.querySelector('.medida-sel').value)];
-      w = m.w; h = m.h; etiqueta = m.etiqueta;
+      const sel = tr.querySelector('.medida-sel');
+      if (sel.value === 'custom') {
+        w = parseNum(tr.querySelector('.ancho').value);
+        h = parseNum(tr.querySelector('.alto').value);
+        etiqueta = (w && h) ? `${fmtN(w)} x ${fmtN(h)} m` : '';
+      } else {
+        const m = p.medidas[Number(sel.value)];
+        w = m.w; h = m.h; etiqueta = m.etiqueta;
+      }
     }
     return {
       p, w, h, etiqueta,
@@ -686,7 +741,10 @@
       const tr = agregarItem();
       tr.querySelector('.prod').value = it.prod;
       cambiarProducto(tr.querySelector('.prod'));
-      if (it.medida !== undefined) tr.querySelector('.medida-sel').value = it.medida;
+      if (it.medida !== undefined) {
+        tr.querySelector('.medida-sel').value = it.medida;
+        cambiarMedida(tr.querySelector('.medida-sel'));
+      }
       if (it.ancho !== undefined) {
         tr.querySelector('.ancho').value = it.ancho;
         tr.querySelector('.alto').value = it.alto;
