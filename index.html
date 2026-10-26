@@ -188,8 +188,8 @@
     return [V(0,0,1,1,'vidrio')];
   }
 
-  // Dibujo técnico dentro del PDF, estilo de las fichas: perfiles de aluminio en bandas,
-  // vidrio celeste, líneas punteadas de apertura y manija del lado elegido.
+  // Dibujo técnico dentro del PDF: perfiles en bandas, vidrio celeste, líneas de apertura,
+  // manija del lado elegido. Negro y blanco usan paletas distintas.
   function bandas(doc, x, y, w, h, colores, grosor) {
     colores.forEach((c, i) => {
       const d = i * grosor;
@@ -198,27 +198,35 @@
     });
   }
 
-  function dibujarAberturaPDF(doc, tipo, x, y, W, H, manija) {
+  function dibujarAberturaPDF(doc, tipo, x, y, W, H, manija, color) {
     const lado = (manija || '').includes('izquierda') ? 'izq' : 'der';
-    const PERFIL = [[88, 94, 100], [170, 176, 182], [110, 116, 122], [205, 210, 215]];
-    const PERFIL_HOJA = [[70, 76, 82], [160, 166, 172]];
+    const negro = !/blanc/i.test(color || '');
+    const PERFIL = negro
+      ? [[88, 94, 100], [170, 176, 182], [110, 116, 122], [205, 210, 215]]
+      : [[182, 186, 191], [236, 238, 240], [200, 204, 208], [248, 249, 250]];
+    const PERFIL_HOJA = negro
+      ? [[70, 76, 82], [160, 166, 172]]
+      : [[190, 194, 199], [246, 247, 248]];
+    const PANEL = negro
+      ? [[120, 130, 138], [185, 195, 202]]
+      : [[190, 194, 198], [238, 240, 242]];
     const VIDRIO = [218, 234, 242];
+    const TRAZO = negro ? [35, 38, 42] : [70, 74, 80];
 
-    // Marco exterior en bandas (como el marco de la ficha)
+    // Marco exterior en bandas
     bandas(doc, x, y, W, H, PERFIL, 0.55);
     const ix = x + 4 * 0.55, iy = y + 4 * 0.55, iw = W - 8 * 0.55, ih = H - 8 * 0.55;
 
-    // Línea de alféizar (como el trazo de base de la ficha)
-    doc.setDrawColor(70, 76, 82); doc.setLineWidth(0.35);
+    // Línea de alféizar
+    doc.setDrawColor(...TRAZO); doc.setLineWidth(0.35);
     doc.line(x - 1.5, y + H + 0.7, x + W + 1.5, y + H + 0.7);
 
     for (const c of cellsFor(tipo)) {
       const cx = ix + c.x * iw, cy = iy + c.y * ih, cw = c.w * iw, ch = c.h * ih;
       const operable = ['osc', 'abrir', 'corr', 'basc'].includes(c.k);
 
-      // Perfil de la hoja o del panel
       if (c.k === 'macizo') {
-        bandas(doc, cx + 0.2, cy + 0.2, cw - 0.4, ch - 0.4, [[120, 130, 138], [185, 195, 202]], 0.45);
+        bandas(doc, cx + 0.2, cy + 0.2, cw - 0.4, ch - 0.4, PANEL, 0.45);
       } else {
         bandas(doc, cx + 0.2, cy + 0.2, cw - 0.4, ch - 0.4, PERFIL_HOJA, 0.45);
         doc.setFillColor(VIDRIO[0], VIDRIO[1], VIDRIO[2]);
@@ -227,7 +235,6 @@
 
       const gx = cx + 1.0, gy = cy + 1.0, gw = cw - 2.0, gh = ch - 2.0;
       if (c.k === 'vidrio') {
-        // Reflejos diagonales del vidrio
         doc.setDrawColor(160, 190, 205); doc.setLineWidth(0.25);
         doc.line(gx + gw * 0.10, gy + gh * 0.95, gx + gw * 0.55, gy + gh * 0.05);
         doc.line(gx + gw * 0.60, gy + gh * 0.95, gx + gw * 0.92, gy + gh * 0.30);
@@ -237,7 +244,7 @@
         doc.rect(gx + 1.2, gy + 1.2, gw - 2.4, gh - 2.4);
       }
 
-      // Líneas punteadas de apertura (azul grisáceo, como en la ficha)
+      // Líneas punteadas de apertura
       doc.setDrawColor(70, 100, 125); doc.setLineWidth(0.25);
       doc.setLineDashPattern([0.8, 0.6], 0);
       if (c.k === 'osc') {
@@ -258,14 +265,35 @@
         if (c.k === 'corr') mx = c.x === 0 ? gx + gw - 0.8 : gx + 0.8;
         else mx = lado === 'izq' ? gx + 0.8 : gx + gw - 0.8;
         const my = gy + gh / 2;
-        doc.setFillColor(35, 38, 42);
+        doc.setFillColor(...TRAZO);
         doc.rect(mx - 0.45, my - 2.2, 0.9, 4.4, 'F');
-        doc.setDrawColor(35, 38, 42); doc.setLineWidth(0.35);
+        doc.setDrawColor(...TRAZO); doc.setLineWidth(0.35);
         const dir = mx > gx + gw / 2 ? -1 : 1;
         doc.line(mx, my, mx + dir * 1.8, my);
       }
     }
     doc.setLineWidth(0.25);
+  }
+
+  // Cotas: ancho arriba y alto a la izquierda, en milímetros
+  function dibujarCotas(doc, x, y, W, H, w, h) {
+    doc.setDrawColor(60, 64, 70); doc.setTextColor(60, 64, 70);
+    doc.setLineWidth(0.15); doc.setFontSize(6);
+    if (w) {
+      const yc = y - 1.5;
+      doc.line(x, yc, x + W, yc);
+      doc.line(x, yc - 0.6, x, yc + 0.6);
+      doc.line(x + W, yc - 0.6, x + W, yc + 0.6);
+      doc.text(String(Math.round(w * 1000)), x + W / 2, yc - 0.6, { align: 'center' });
+    }
+    if (h) {
+      const xc = x - 4;
+      doc.line(xc, y, xc, y + H);
+      doc.line(xc - 0.6, y, xc + 0.6, y);
+      doc.line(xc - 0.6, y + H, xc + 0.6, y + H);
+      doc.text(String(Math.round(h * 1000)), x - 1.2, y + H / 2, { align: 'center', angle: 90 });
+    }
+    doc.setTextColor(0, 0, 0); doc.setFontSize(7.5);
   }
 
   // ---------- Filas de la tabla ----------
@@ -473,7 +501,7 @@
     // Tabla de aberturas
     const yTabla = 96, hTabla = 112;
     caja(8, yTabla, 194, hTabla);
-    const cProd = 26, cCant = 140, cPrec = 170, cImp = 200;
+    const cProd = 34, cCant = 140, cPrec = 170, cImp = 200;
     doc.setFont(undefined, 'bold');
     doc.setFontSize(8);
     txt('Producto', cProd, yTabla + 6);
@@ -486,9 +514,10 @@
     doc.setFontSize(7.5);
     let y = yTabla + 12;
     for (const f of filas) {
-      const lineas = doc.splitTextToSize(descripcionFila(f), 108);
-      const rowH = Math.max(22, lineas.length * 3.6 + 6);
-      dibujarAberturaPDF(doc, f.p.tipo, 10, y, 14, 20, f.manija);
+      const lineas = doc.splitTextToSize(descripcionFila(f), 100);
+      const rowH = Math.max(25, lineas.length * 3.6 + 6);
+      dibujarAberturaPDF(doc, f.p.tipo, 14.5, y + 4, 13, 18, f.manija, f.color);
+      dibujarCotas(doc, 14.5, y + 4, 13, 18, f.w, f.h);
       txt(lineas, cProd, y + 3);
       txt(String(f.cant), cCant, y + 3, { align: 'right' });
       txt(f.precio ? fmt(f.precio) : 'A cotizar', cPrec, y + 3, { align: 'right' });
